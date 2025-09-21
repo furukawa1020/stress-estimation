@@ -2,19 +2,127 @@ import Image from "next/image";
 
 export default function Home() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
+    'use client'
+
+import { useState, useRef, useEffect } from 'react'
+import { StressDetectionSystem } from '@/components/StressDetectionSystem'
+import { FuguVisualization } from '@/components/FuguVisualization'
+import { motion } from 'framer-motion'
+
+export default function Home() {
+  const [isSystemActive, setIsSystemActive] = useState(false)
+  const [stressData, setStressData] = useState({
+    heartRate: 0,
+    stressLevel: 0,
+    emotionalState: 'neutral' as 'calm' | 'neutral' | 'stressed' | 'anxious',
+    confidence: 0,
+    timestamp: Date.now()
+  })
+
+  const handleStressDataUpdate = (newData: typeof stressData) => {
+    setStressData(newData)
+  }
+
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
+      <div className="container mx-auto max-w-6xl">
+        {/* ヘッダー */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center py-8"
+        >
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-4">
+            🔬 次世代ストレス推定システム
+          </h1>
+          <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+            WebRTC + Transformer.js による学術レベルのリアルタイム生理学的ストレス検出
+          </p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* 左側: ストレス検出システム */}
+          <motion.div
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <StressDetectionSystem
+              isActive={isSystemActive}
+              onToggle={setIsSystemActive}
+              onStressDataUpdate={handleStressDataUpdate}
+            />
+          </motion.div>
+
+          {/* 右側: フグ可視化システム */}
+          <motion.div
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <FuguVisualization stressData={stressData} />
+          </motion.div>
+        </div>
+
+        {/* データ表示パネル */}
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="mt-8 bg-white/80 backdrop-blur-sm rounded-xl p-6 border border-gray-200"
+        >
+          <h3 className="text-xl font-semibold mb-4 text-gray-800">📊 リアルタイム生理学的指標</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center p-4 bg-red-50 rounded-lg">
+              <div className="text-2xl font-bold text-red-600">{stressData.heartRate}</div>
+              <div className="text-sm text-gray-600">心拍数 (BPM)</div>
+            </div>
+            <div className="text-center p-4 bg-orange-50 rounded-lg">
+              <div className="text-2xl font-bold text-orange-600">{Math.round(stressData.stressLevel * 100)}%</div>
+              <div className="text-sm text-gray-600">ストレスレベル</div>
+            </div>
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <div className="text-2xl font-bold text-blue-600">{stressData.emotionalState}</div>
+              <div className="text-sm text-gray-600">感情状態</div>
+            </div>
+            <div className="text-center p-4 bg-green-50 rounded-lg">
+              <div className="text-2xl font-bold text-green-600">{Math.round(stressData.confidence * 100)}%</div>
+              <div className="text-sm text-gray-600">信頼度</div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* 学術的説明 */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8 }}
+          className="mt-8 bg-white/80 backdrop-blur-sm rounded-xl p-6 border border-gray-200"
+        >
+          <h3 className="text-xl font-semibold mb-4 text-gray-800">🎓 技術説明</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-700">
+            <div>
+              <h4 className="font-semibold text-purple-600 mb-2">🫀 心拍数測定 (rPPG)</h4>
+              <p>リモート光容積脈波解析によりカメラから非接触で心拍数を検出。顔面の微細な血流変化を解析。</p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-purple-600 mb-2">😊 表情分析</h4>
+              <p>Transformer.jsによる深層学習ベースの表情認識。微細な表情変化からストレス状態を推定。</p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-purple-600 mb-2">👁️ 瞳孔径変化</h4>
+              <p>自律神経活動の指標として瞳孔径変化をリアルタイム検出。ストレス応答の早期発見。</p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-purple-600 mb-2">🎭 マイクロエクスプレッション</h4>
+              <p>無意識の微細表情変化を高周波数解析。隠れたストレス反応を検出。</p>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </main>
+  )
+}" "}
             <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
               src/app/page.tsx
             </code>
