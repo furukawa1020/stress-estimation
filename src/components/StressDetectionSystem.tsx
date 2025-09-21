@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Camera, CameraOff, Play, Pause, Activity } from 'lucide-react'
+import { Camera, CameraOff, Play, Pause, Activity } from '@/lib/icons'
 import { WebRTCManager } from '@/lib/webrtc-manager'
 import { StressAnalyzer } from '@/lib/stress-analyzer'
 import { DataCollector } from '@/lib/data-collector'
