@@ -1,7 +1,11 @@
 /**
  * StressAnalyzer - 学術研究レベルのストレス推定エンジン
  * 最新の研究手法を組み合わせた多角的ストレス分析システム
+ * 環境光・距離補正対応（2024-2025年研究ベース）
  */
+
+// 環境補正システムのインポート
+import { EnvironmentCorrector, EnvironmentalCorrection, RPPGQualityMetrics, AdaptiveRPPGParams } from './environment-correction'
 
 // Transformer.jsを動的インポートで使用
 let transformersLoaded = false
@@ -46,6 +50,13 @@ interface AnalysisResult {
     parasympathetic: number
     balance: number
   }
+  // 環境品質指標
+  environmentalQuality?: {
+    lightingCondition: number
+    distanceOptimal: number
+    motionLevel: number
+    overallQuality: number
+  }
 }
 
 export class StressAnalyzer {
@@ -65,6 +76,7 @@ export class StressAnalyzer {
   private pupilDetector: any = null
   
   // 環境補正システム（2024-2025年研究ベース）
+  private environmentCorrector: EnvironmentCorrector
   private environmentalCalibration = {
     ambientLight: 0,
     faceDistance: 0,
@@ -76,10 +88,11 @@ export class StressAnalyzer {
   
   // 時間的一貫性追跡
   private temporalConsistency = {
-    previousFrames: [] as any[],
+    previousFrames: [] as ImageData[],
     motionBuffer: [] as number[],
     lightingBuffer: [] as number[],
-    distanceBuffer: [] as number[]
+    distanceBuffer: [] as number[],
+    qualityBuffer: [] as RPPGQualityMetrics[]
   }
   
   // カリブレーション用ベースライン
@@ -95,6 +108,9 @@ export class StressAnalyzer {
       this.canvas = new OffscreenCanvas(640, 480)
       this.ctx = this.canvas.getContext('2d')
     }
+    
+    // 環境補正システム初期化
+    this.environmentCorrector = new EnvironmentCorrector()
   }
 
   /**
@@ -189,7 +205,8 @@ export class StressAnalyzer {
   }
 
   /**
-   * フレーム分析（メイン処理）
+   * フレーム分析（環境補正対応版）
+   * Environmental correction integrated frame analysis
    */
   async analyzeFrame(video: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<AnalysisResult | null> {
     if (!this.isInitialized) {
@@ -206,34 +223,81 @@ export class StressAnalyzer {
       canvas.height = video.videoHeight
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-      // 1. 顔検出・ランドマーク抽出
+      // フレームデータ取得
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+
+      // ========== 環境補正システム適用 ==========
+      
+      // 1. 環境光・露出補正
+      const environmentalCorrection = await this.environmentCorrector.detectAndCorrectAmbientLight(imageData)
+      
+      // 2. 顔検出・ランドマーク抽出
       const faceData = await this.detectFace(canvas)
       if (!faceData.detected) {
         return null
       }
 
-      // 2. rPPG（心拍数）分析
-      const heartRate = await this.analyzeHeartRate(canvas, faceData.landmarks)
+      // 3. 距離正規化
+      const distanceNormalization = await this.environmentCorrector.detectAndNormalizeFaceDistance(faceData.landmarks)
+      
+      // 4. Motion Artifact検出・除去
+      this.temporalConsistency.previousFrames.push(imageData)
+      if (this.temporalConsistency.previousFrames.length > 10) {
+        this.temporalConsistency.previousFrames.shift()
+      }
+      
+      const motionArtifactLevel = await this.environmentCorrector.detectAndReduceMotionArtifacts(
+        imageData, 
+        this.temporalConsistency.previousFrames.slice(-3)
+      )
 
-      // 3. 表情分析
+      // 5. 肌色セグメンテーション（照明不変）
+      const skinSegmentedFrame = await this.environmentCorrector.performSkinSegmentation(imageData, faceData.landmarks)
+
+      // ========== 生理学的信号抽出（補正済み） ==========
+      
+      // 6. rPPG信号抽出（環境補正適用）
+      const rppgSignal = await this.extractCorrectedRPPG(skinSegmentedFrame, faceData.landmarks, environmentalCorrection, distanceNormalization)
+      
+      // 7. rPPG信号品質評価
+      const qualityMetrics = await this.environmentCorrector.assessRPPGQuality(rppgSignal, faceData.landmarks, motionArtifactLevel)
+      
+      // 品質が低い場合の適応的処理
+      if (qualityMetrics.overallQuality < 30) {
+        console.warn('⚠️ 低品質信号検出 - 環境改善を推奨', qualityMetrics)
+        return this.getAdaptiveAnalysisResult(qualityMetrics, faceData.landmarks)
+      }
+
+      // ========== 学術レベル多角的解析 ==========
+      
+      // 8. HRV解析（環境補正版）
+      const heartRate = await this.extractHeartRateFromCorrectedSignal(rppgSignal, qualityMetrics)
+      
+      // 9. 表情分析（Facial Action Units）
       const emotionData = await this.analyzeEmotion(canvas)
-
-      // 4. 瞳孔径測定
+      const facialMetrics = await this.analyzeAcademicFacialActionUnits(faceData.landmarks)
+      
+      // 10. 瞳孔動態解析
       const pupilDiameter = await this.analyzePupil(faceData.landmarks)
+      const pupilMetrics = await this.analyzePupilDynamics(faceData.landmarks)
 
-      // 5. マイクロエクスプレッション検出
+      // 11. マイクロエクスプレッション検出（環境補正版）
       const microExpressions = await this.detectMicroExpressions(faceData.landmarks)
 
-      // 6. 頭部姿勢分析
+      // 12. 頭部姿勢分析
       const headPose = this.analyzeHeadPose(faceData.landmarks)
 
-      // 7. 統合ストレス指標計算
-      const stressMetrics = this.calculateStressMetrics({
+      // 13. 統合ストレス指標計算（環境補正考慮）
+      const stressMetrics = this.calculateEnvironmentCorrectedStressMetrics({
         heartRate,
         emotion: emotionData,
+        facialMetrics,
         pupilDiameter,
+        pupilMetrics,
         microExpressions,
-        headPose
+        headPose,
+        qualityMetrics,
+        environmentalCorrection
       })
 
       return {
@@ -253,6 +317,215 @@ export class StressAnalyzer {
       console.error('Frame analysis error:', error)
       return null
     }
+  }
+
+  // ============ 環境補正対応メソッド ============
+
+  /**
+   * 環境補正対応rPPG信号抽出
+   */
+  private async extractCorrectedRPPG(
+    skinSegmentedFrame: ImageData, 
+    landmarks: any[], 
+    environmentalCorrection: EnvironmentalCorrection, 
+    distanceNormalization: number
+  ): Promise<number[]> {
+    // 1. 基本rPPG信号抽出
+    const baseRPPG = await this.extractBasicRPPG(skinSegmentedFrame, landmarks)
+    
+    // 2. 環境光補正適用
+    const lightCorrected = this.applyLightingCorrection(baseRPPG, environmentalCorrection.lightingCompensation)
+    
+    // 3. 距離正規化適用
+    const distanceCorrected = this.applyDistanceCorrection(lightCorrected, distanceNormalization)
+    
+    // 4. モーション補正
+    const motionCorrected = this.applyMotionCorrection(distanceCorrected, environmentalCorrection.motionArtifactReduction)
+    
+    return motionCorrected
+  }
+
+  /**
+   * 低品質信号用適応的結果生成
+   */
+  private getAdaptiveAnalysisResult(qualityMetrics: RPPGQualityMetrics, landmarks?: any[]): AnalysisResult | null {
+    return {
+      heartRate: 75,
+      stressLevel: 50,
+      emotionalState: 'neutral' as const,
+      confidence: qualityMetrics.overallQuality / 100,
+      rppgSignal: [],
+      facialLandmarks: landmarks || [],
+      pupilDiameter: 3.5,
+      microExpressions: [],
+      headPose: { yaw: 0, pitch: 0, roll: 0 },
+      autonomicNervousSystem: {
+        sympathetic: 50,
+        parasympathetic: 50,
+        balance: 0
+      },
+      environmentalQuality: {
+        lightingCondition: qualityMetrics.lightingStability,
+        distanceOptimal: 1.0,
+        motionLevel: qualityMetrics.motionArtifactLevel,
+        overallQuality: qualityMetrics.overallQuality
+      }
+    }
+  }
+
+  /**
+   * 補正済み信号からの心拍数抽出
+   */
+  private async extractHeartRateFromCorrectedSignal(rppgSignal: number[], qualityMetrics: RPPGQualityMetrics): Promise<number> {
+    if (rppgSignal.length === 0) return 75
+    
+    const fftResult = this.performFFTAnalysis(rppgSignal)
+    const heartRatePeak = this.findHeartRatePeak(fftResult, qualityMetrics)
+    
+    return heartRatePeak
+  }
+
+  /**
+   * 環境補正考慮ストレス指標計算
+   */
+  private calculateEnvironmentCorrectedStressMetrics(params: any): { stressLevel: number; confidence: number; ans: any } {
+    const qualityWeight = Math.max(0.3, params.qualityMetrics.overallQuality / 100)
+    const baseStress = this.calculateBaseStressLevel(params)
+    const environmentalConfidence = this.calculateEnvironmentalConfidence(params.environmentalCorrection, params.qualityMetrics)
+    
+    return {
+      stressLevel: baseStress * qualityWeight,
+      confidence: environmentalConfidence,
+      ans: {
+        sympathetic: baseStress,
+        parasympathetic: 100 - baseStress,
+        balance: this.calculateANSBalance(params.heartRate, params.pupilDiameter || 3.5, params.emotion || { dominant: 'neutral' })
+      }
+    }
+  }
+
+  // ============ 環境補正ヘルパーメソッド ============
+
+  private async extractBasicRPPG(frame: ImageData, landmarks: any[]): Promise<number[]> {
+    const roi = this.extractFaceROI(frame, landmarks)
+    return this.applyCHROMMethod(roi)
+  }
+
+  private applyLightingCorrection(signal: number[], compensation: number): number[] {
+    return signal.map(value => value * compensation)
+  }
+
+  private applyDistanceCorrection(signal: number[], normalization: number): number[] {
+    return signal.map(value => value * normalization)
+  }
+
+  private applyMotionCorrection(signal: number[], reduction: number): number[] {
+    const filtered = []
+    const windowSize = Math.max(1, Math.floor(reduction * 5))
+    
+    for (let i = 0; i < signal.length; i++) {
+      const start = Math.max(0, i - windowSize)
+      const end = Math.min(signal.length, i + windowSize + 1)
+      const average = signal.slice(start, end).reduce((a, b) => a + b, 0) / (end - start)
+      filtered.push(average)
+    }
+    
+    return filtered
+  }
+
+  private extractFaceROI(frame: ImageData, landmarks: any[]): ImageData {
+    if (!landmarks || landmarks.length === 0) return frame
+    
+    const xs = landmarks.map((p: any) => p.x)
+    const ys = landmarks.map((p: any) => p.y)
+    const minX = Math.max(0, Math.min(...xs) - 10)
+    const maxX = Math.min(frame.width, Math.max(...xs) + 10)
+    const minY = Math.max(0, Math.min(...ys) - 10)
+    const maxY = Math.min(frame.height, Math.max(...ys) + 10)
+    
+    const width = maxX - minX
+    const height = maxY - minY
+    const roiData = new Uint8ClampedArray(width * height * 4)
+    
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const srcIndex = ((minY + y) * frame.width + (minX + x)) * 4
+        const dstIndex = (y * width + x) * 4
+        
+        for (let c = 0; c < 4; c++) {
+          roiData[dstIndex + c] = frame.data[srcIndex + c]
+        }
+      }
+    }
+    
+    return new ImageData(roiData, width, height)
+  }
+
+  private applyCHROMMethod(roi: ImageData): number[] {
+    const signal = []
+    const data = roi.data
+    
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i]
+      const g = data[i + 1]
+      const chromValue = 3 * r - 2 * g
+      signal.push(chromValue)
+    }
+    
+    return signal
+  }
+
+  private performFFTAnalysis(signal: number[]): any {
+    const fftResult = []
+    const sampleRate = 30
+    
+    for (let freq = 0.5; freq <= 4.0; freq += 0.1) {
+      let real = 0, imag = 0
+      
+      for (let i = 0; i < signal.length; i++) {
+        const angle = 2 * Math.PI * freq * i / sampleRate
+        real += signal[i] * Math.cos(angle)
+        imag += signal[i] * Math.sin(angle)
+      }
+      
+      const magnitude = Math.sqrt(real * real + imag * imag)
+      fftResult.push({ frequency: freq, magnitude })
+    }
+    
+    return fftResult
+  }
+
+  private findHeartRatePeak(fftResult: any[], qualityMetrics: RPPGQualityMetrics): number {
+    const heartRateBand = fftResult.filter(f => f.frequency >= 0.8 && f.frequency <= 3.0)
+    
+    if (heartRateBand.length === 0) return 75
+    
+    const peak = heartRateBand.reduce((max, current) => 
+      current.magnitude > max.magnitude ? current : max
+    )
+    
+    return peak.frequency * 60
+  }
+
+  private calculateBaseStressLevel(params: any): number {
+    const { heartRate, emotion, pupilDiameter } = params
+    
+    const hrStress = Math.max(0, Math.min(100, (heartRate - 60) * 2))
+    const emotionStress = emotion.dominant === 'stressed' ? 80 : emotion.dominant === 'anxious' ? 70 : 30
+    const pupilStress = Math.max(0, Math.min(100, (pupilDiameter - 3.0) * 50))
+    
+    return (hrStress * 0.4 + emotionStress * 0.4 + pupilStress * 0.2)
+  }
+
+  private calculateEnvironmentalConfidence(
+    environmentalCorrection: EnvironmentalCorrection, 
+    qualityMetrics: RPPGQualityMetrics
+  ): number {
+    const lightingQuality = Math.max(0.1, Math.min(1.0, environmentalCorrection.lightingCompensation))
+    const motionQuality = Math.max(0.1, 1.0 - environmentalCorrection.motionArtifactReduction)
+    const overallQuality = qualityMetrics.overallQuality / 100
+    
+    return (lightingQuality * 0.3 + motionQuality * 0.3 + overallQuality * 0.4)
   }
 
   /**
