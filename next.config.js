@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  turbo: {
-    moduleIdStrategy: 'deterministic',
-  },
   headers: async () => [
     {
       source: '/(.*)',
@@ -22,28 +19,11 @@ const nextConfig = {
       ],
     },
   ],
-  outputFileTracingRoot: process.cwd(),
-  serverComponentsExternalPackages: [
-    '@tensorflow/tfjs',
-    '@tensorflow/tfjs-node',
-    '@vladmandic/face-api',
-  ],
-  experimental: {
-    turbo: {},
-  },
   eslint: {
     ignoreDuringBuilds: true,
   },
   typescript: {
     ignoreBuildErrors: true,
-  },
-  async rewrites() {
-    return [
-      {
-        source: '/api/mediapipe/:path*',
-        destination: '/api/mediapipe/:path*',
-      },
-    ];
   },
   transpilePackages: ['@tensorflow/tfjs'],
   webpack: (config, { isServer }) => {
