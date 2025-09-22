@@ -492,7 +492,7 @@ export class WorkerManager {
    */
   private static executeTask(workerIdx: number, data: any): Promise<any> {
     return new Promise((resolve, reject) => {
-      const taskId = Date.now() + Math.random()
+      const taskId = Date.now() + workerIdx // ワーカーインデックスベースのID
       
       const timeout = setTimeout(() => {
         reject(new Error('Worker task timeout'))

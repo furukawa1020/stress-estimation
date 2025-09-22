@@ -308,11 +308,6 @@ export class EnvironmentCorrector {
   /**
    * 頭部動き検出
    */
-  private detectHeadMotion(opticalFlow: number[][]): number {
-    // グローバル動きベクトルの大きさ計算
-    return 0.1 // 簡略実装
-  }
-
   /**
    * グローバル動き分離
    */
@@ -344,7 +339,7 @@ export class EnvironmentCorrector {
     }
     
     // 2. 各領域の色統計計算
-    const regionStats = {}
+    const regionStats: Record<string, any> = {}
     for (const [regionName, region] of Object.entries(faceRegions)) {
       regionStats[regionName] = this.calculateRegionColorStats(frame, region)
     }
@@ -534,34 +529,6 @@ export class EnvironmentCorrector {
     const stabilityScore = this.calculateStabilityScore(autocorrelation, psd, snr, trendAnalysis)
     
     return Math.max(0.1, Math.min(1.0, stabilityScore))
-  }
-
-  /**
-   * オプティカルフロー計算（Lucas-Kanade法完全実装）
-   * Lucas-Kanade Optical Flow with Pyramid Implementation
-   */
-  private calculateOpticalFlow(current: ImageData, previous: ImageData): number[][] {
-    // 1. ガウシアンピラミッド構築
-    const currentPyramid = this.buildGaussianPyramid(current, 3)
-    const previousPyramid = this.buildGaussianPyramid(previous, 3)
-    
-    // 2. 特徴点検出（Harris Corner Detection）
-    const cornerPoints = this.detectHarrisCorners(current, 100)
-    
-    // 3. ピラミッドLucas-Kanadeアルゴリズム
-    const flow: number[][] = []
-    
-    for (const point of cornerPoints) {
-      const flowVector = this.computePyramidLK(point, currentPyramid, previousPyramid)
-      if (flowVector) {
-        flow.push([point.x, point.y, flowVector.dx, flowVector.dy, flowVector.confidence])
-      }
-    }
-    
-    // 4. フロー検証・フィルタリング
-    const validatedFlow = this.validateOpticalFlow(flow)
-    
-    return validatedFlow
   }
 
   /**
