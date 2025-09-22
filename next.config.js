@@ -26,7 +26,6 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  transpilePackages: ['@tensorflow/tfjs'],
   webpack: (config, { isServer }) => {
     config.resolve.alias = {
       ...config.resolve.alias,
