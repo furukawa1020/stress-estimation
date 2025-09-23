@@ -2313,7 +2313,9 @@ export default function StressEstimationApp() {
       
       // 4. オーバーレイ描画開始（カメラ準備完了後）
       setTimeout(() => {
-        console.log('🎨 オーバーレイ描画開始')
+        console.log('🎨 オーバーレイ描画開始タイマー実行')
+        console.log('🔍 状態確認 - isRunning:', state.isRunning)
+        console.log('🔍 要素確認 - video:', !!videoRef.current, 'canvas:', !!canvasRef.current)
         drawFaceOverlay()
       }, 1000) // カメラ安定化待ち
       
