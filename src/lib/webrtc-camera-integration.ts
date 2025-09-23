@@ -330,6 +330,12 @@ export class RealTimeStreamProcessor {
   private static lastFrameTime = 0
   private static aiAnalyzer: HybridDeepLearningModel | null = null
   
+  // 軽量化：処理間隔制御
+  private static lastAiProcessingTime = 0
+  private static aiProcessingInterval = 3000 // 3秒間隔（大幅軽量化）
+  private static frameSkipCounter = 0
+  private static frameSkipInterval = 10 // 10フレームに1回のみ処理
+  
   // 新しい検出状態管理
   private static detectionState = {
     faceDetected: false,
@@ -495,8 +501,15 @@ export class RealTimeStreamProcessor {
       let stressLevel: number
       let confidence: number
       
-      if (this.aiAnalyzer) {
+      // 軽量化：処理間隔制御
+      const now = Date.now()
+      const shouldSkipAI = (now - this.lastAiProcessingTime) < this.aiProcessingInterval
+      
+      if (this.aiAnalyzer && !shouldSkipAI) {
         try {
+          console.log('🧠 本格ハイブリッドAI分析実行中...（3秒間隔）')
+          this.lastAiProcessingTime = now
+          
           // 実際の画像データから特徴量抽出
           const visualFeatures = this.extractRealVisualFeatures(imageData, avgR, avgG, avgB, brightness, redDominance)
           const hrFeatures = this.extractHeartRateFeatures(imageData) // 実際のrPPG解析
@@ -504,7 +517,6 @@ export class RealTimeStreamProcessor {
           const temporalFeatures = this.extractTemporalFeatures()
           
           // ★★★ HybridDeepLearningModelによる高精度分析 ★★★
-          console.log('🧠 本格ハイブリッドAI分析実行中...')
           
           // 本物のHybridDeepLearningModelを使用
           const prediction = await this.aiAnalyzer.predict({
@@ -537,7 +549,8 @@ export class RealTimeStreamProcessor {
           confidence = fallbackResult.confidence
         }
       } else {
-        // フォールバック：実データベースの軽量版分析  
+        // 軽量化：AI処理スキップ時 or AIアナライザー未初期化時
+        console.log('⚡ 軽量モード：フォールバック分析使用')
         const fallbackResult = this.performFallbackAnalysis(avgR, avgG, avgB, brightness, redDominance)
         stressLevel = fallbackResult.stressLevel
         confidence = fallbackResult.confidence
