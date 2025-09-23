@@ -332,9 +332,10 @@ export class RealTimeStreamProcessor {
   
   // 軽量化：処理間隔制御
   private static lastAiProcessingTime = 0
-  private static aiProcessingInterval = 3000 // 3秒間隔（大幅軽量化）
+  private static aiProcessingInterval = 5000 // 5秒間隔（さらに軽量化）
   private static frameSkipCounter = 0
-  private static frameSkipInterval = 10 // 10フレームに1回のみ処理
+  private static frameSkipInterval = 30 // 30フレームに1回のみ処理（大幅軽量化）
+  private static lastStressResult: StressEstimationResult | null = null
   
   // 新しい検出状態管理
   private static detectionState = {
@@ -404,6 +405,15 @@ export class RealTimeStreamProcessor {
         return
       }
       
+      // 軽量化：フレームスキップ（大幅軽量化）
+      this.frameSkipCounter++
+      if (this.frameSkipCounter < this.frameSkipInterval) {
+        // フレームスキップ：軽量更新のみ
+        this.updateStatistics(frameStartTime, performance.now(), performance.now())
+        return // void return
+      }
+      this.frameSkipCounter = 0 // リセット
+      
       // 軽量化：重い信号処理をスキップしてダイレクトにAI推論
       // const enhancedImage = await UltraHighPrecisionSignalProcessor.processRealtimeOptimized(
       //   imageData, 
@@ -414,6 +424,9 @@ export class RealTimeStreamProcessor {
       const aiStartTime = performance.now()
       const stressResult = await this.performStressAnalysis(imageData) // enhancedImageではなくimageDataを直接使用
       const aiEndTime = performance.now()
+      
+      // 結果をキャッシュ
+      this.lastStressResult = stressResult
       
       // 統計更新
       this.updateStatistics(frameStartTime, aiStartTime, aiEndTime)
