@@ -1,8 +1,8 @@
 /**
- * WebRTCカメラ統合システム - 完全版
+ * WebRTCカメラ統合システム
  * リアルタイム映像取得、AIエンジン統合、ストリーム処理パイプライン
- * デバイス適応システムと超高精度信号処理の完全統合
- * 完全に動作する世界最先端ストレス推定システム
+ * デバイス適応システムと信号処理の統合
+ * ストレス推定システム
  */
 
 import { DeviceDetectionEngine, UnifiedDeviceAdaptationSystem } from './device-adaptation'
@@ -332,9 +332,9 @@ export class RealTimeStreamProcessor {
   
   // 軽量化：処理間隔制御
   private static lastAiProcessingTime = 0
-  private static aiProcessingInterval = 5000 // 5秒間隔（さらに軽量化）
+  private static aiProcessingInterval = 1000 // 1秒間隔（HybridModelをもっと使用）
   private static frameSkipCounter = 0
-  private static frameSkipInterval = 30 // 30フレームに1回のみ処理（大幅軽量化）
+  private static frameSkipInterval = 5 // 5フレームに1回（HybridModelをもっと使用）
   private static lastStressResult: StressEstimationResult | null = null
   
   // 新しい検出状態管理
@@ -360,7 +360,7 @@ export class RealTimeStreamProcessor {
     try {
       console.log('リアルタイムストリーム処理開始（ハイブリッドAI統合版）...')
       
-      // ★★★ ハイブリッドディープラーニング統合 ★★★
+      // ハイブリッドディープラーニング統合
       this.aiAnalyzer = new HybridDeepLearningModel()
       await this.aiAnalyzer.initialize()
       console.log('✅ HybridDeepLearningModel AIアナライザー初期化完了')
@@ -473,7 +473,7 @@ export class RealTimeStreamProcessor {
       const brightness = (avgR + avgG + avgB) / 3
       const redDominance = avgR / (avgG + avgB + 1)
       
-      // ★★★ 顔検出処理（一時的に簡易版） ★★★
+      // 顔検出処理（一時的に簡易版）
       const faceDetected = {
         detected: true,
         confidence: 0.8,
@@ -510,7 +510,7 @@ export class RealTimeStreamProcessor {
         }
       }
       
-      // ★★★ ハイブリッドディープラーニング統合分析 ★★★
+      // ハイブリッドディープラーニング統合分析
       let stressLevel: number
       let confidence: number
       
@@ -520,7 +520,7 @@ export class RealTimeStreamProcessor {
       
       if (this.aiAnalyzer && !shouldSkipAI) {
         try {
-          console.log('🧠 本格ハイブリッドAI分析実行中...（3秒間隔）')
+          console.log('🧠 ハイブリッドAI分析実行中...（1秒間隔）')
           this.lastAiProcessingTime = now
           
           // 実際の画像データから特徴量抽出
@@ -529,7 +529,7 @@ export class RealTimeStreamProcessor {
           const environmentalFeatures = this.analyzeEnvironmentalConditions(imageData, brightness)
           const temporalFeatures = this.extractTemporalFeatures()
           
-          // ★★★ HybridDeepLearningModelによる高精度分析 ★★★
+          // HybridDeepLearningModelによる分析
           
           // 本物のHybridDeepLearningModelを使用
           const prediction = await this.aiAnalyzer.predict({
@@ -542,7 +542,7 @@ export class RealTimeStreamProcessor {
           stressLevel = this.convertStressLevelToNumber(prediction.stressLevel, prediction.probabilities)
           confidence = prediction.confidence
           
-          console.log(`✅ 本格ハイブリッドAI分析完了: ストレス=${stressLevel.toFixed(1)}, 信頼度=${confidence.toFixed(2)}`)
+          console.log(`✅ ハイブリッドAI分析完了: ストレス=${stressLevel.toFixed(1)}, 信頼度=${confidence.toFixed(2)}`)
           console.log('📊 AI予測詳細:', {
             stressCategory: prediction.stressLevel,
             probabilities: prediction.probabilities,
