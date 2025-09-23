@@ -1751,7 +1751,10 @@ export default function StressEstimationApp() {
    * 軽量Canvas描画（AI処理なし）
    */
   const drawFaceOverlay = () => {
+    console.log('🎨 drawFaceOverlay実行開始')
+    
     if (!videoRef.current || !canvasRef.current) {
+      console.log('❌ 要素なし - video:', !!videoRef.current, 'canvas:', !!canvasRef.current)
       if (state.isRunning) {
         animationFrameRef.current = requestAnimationFrame(drawFaceOverlay)
       }
@@ -1763,11 +1766,14 @@ export default function StressEstimationApp() {
     const ctx = canvas.getContext('2d')
     
     if (!ctx) {
+      console.log('❌ Canvas context取得失敗')
       return
     }
     
     // ビデオの準備状態を簡易チェック
+    console.log('📹 ビデオ状態 - readyState:', video.readyState, 'paused:', video.paused)
     if (video.readyState < 2) {
+      console.log('⏳ ビデオ準備待ち')
       animationFrameRef.current = requestAnimationFrame(drawFaceOverlay)
       return
     }
@@ -1775,17 +1781,20 @@ export default function StressEstimationApp() {
     // ビデオサイズ取得
     const videoWidth = video.videoWidth || 640
     const videoHeight = video.videoHeight || 480
+    console.log('📐 ビデオサイズ:', videoWidth, 'x', videoHeight)
     
     // キャンバスサイズ設定
     if (canvas.width !== videoWidth || canvas.height !== videoHeight) {
       canvas.width = videoWidth
       canvas.height = videoHeight
+      console.log('🎬 Canvas リサイズ完了')
     }
     
     try {
       // 軽量描画：ビデオフレームのみ
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      console.log('✅ ビデオフレーム描画成功')
       
       // 軽量オーバーレイ
       ctx.fillStyle = 'rgba(0, 255, 0, 0.2)'
@@ -1793,14 +1802,18 @@ export default function StressEstimationApp() {
       ctx.fillStyle = '#00ff00'
       ctx.font = '16px Arial'
       ctx.fillText('カメラ動作中', 20, 30)
+      console.log('✅ オーバーレイ描画成功')
       
     } catch (error) {
-      console.error('Canvas描画エラー:', error)
+      console.error('❌ Canvas描画エラー:', error)
     }
     
     // 次のフレーム予約（重い処理なし）
     if (state.isRunning) {
+      console.log('🔄 次フレーム予約')
       animationFrameRef.current = requestAnimationFrame(drawFaceOverlay)
+    } else {
+      console.log('⏹️ 描画停止（isRunning=false）')
     }
   }
   
