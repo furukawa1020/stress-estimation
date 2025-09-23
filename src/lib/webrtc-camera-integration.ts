@@ -7,7 +7,7 @@
 
 import { DeviceDetectionEngine, UnifiedDeviceAdaptationSystem } from './device-adaptation'
 import { UltraHighPrecisionSignalProcessor } from './ultra-precision-signal-processing'
-import { StateOfTheArtEnhancements2024 } from './hybrid-deep-learning'
+import { HybridDeepLearningModel } from './hybrid-deep-learning'
 import { EnvironmentalCorrection } from './environment-correction'
 // import { AdvancedHRVAnalysis } from './hrv-analysis' // 統合システム内で実装済み
 import { GPUAccelerationManager } from './gpu-acceleration'
@@ -328,7 +328,15 @@ export class RealTimeStreamProcessor {
   }
   private static frameTimeHistory: number[] = []
   private static lastFrameTime = 0
-  private static aiAnalyzer: StateOfTheArtEnhancements2024 | null = null
+  private static aiAnalyzer: HybridDeepLearningModel | null = null
+  
+  // 新しい検出状態管理
+  private static detectionState = {
+    faceDetected: false,
+    faceBox: null as { x: number; y: number; width: number; height: number } | null,
+    detectionConfidence: 0,
+    measurementStatus: 'unavailable' as 'detecting' | 'measuring' | 'unavailable' | 'error'
+  }
   
   /**
    * ストリーム処理開始
@@ -346,8 +354,9 @@ export class RealTimeStreamProcessor {
       console.log('リアルタイムストリーム処理開始（ハイブリッドAI統合版）...')
       
       // ★★★ ハイブリッドディープラーニング統合 ★★★
-      this.aiAnalyzer = new StateOfTheArtEnhancements2024()
-      console.log('✅ StateOfTheArtEnhancements2024 AIアナライザー初期化完了')
+      this.aiAnalyzer = new HybridDeepLearningModel()
+      await this.aiAnalyzer.initialize()
+      console.log('✅ HybridDeepLearningModel AIアナライザー初期化完了')
       
       // 軽量化：重い信号処理初期化をスキップ
       // await UltraHighPrecisionSignalProcessor.initialize()
@@ -445,6 +454,39 @@ export class RealTimeStreamProcessor {
       const brightness = (avgR + avgG + avgB) / 3
       const redDominance = avgR / (avgG + avgB + 1)
       
+      // ★★★ 顔検出処理追加 ★★★
+      const faceDetected = this.detectFaceInImage(imageData)
+      
+      // 検出状態を更新
+      this.detectionState.faceDetected = faceDetected.detected
+      this.detectionState.faceBox = faceDetected.boundingBox
+      this.detectionState.detectionConfidence = faceDetected.confidence
+      this.detectionState.measurementStatus = faceDetected.detected ? 
+        (faceDetected.confidence > 0.7 ? 'measuring' : 'detecting') : 
+        'unavailable'
+      
+      // 顔が検出されない場合は測定不可結果を返す
+      if (!faceDetected.detected) {
+        return {
+          stressLevel: 0,
+          confidence: 0,
+          physiologicalMetrics: {
+            heartRate: 0,
+            hrv: { rmssd: 0, pnn50: 0, triangularIndex: 0 },
+            facialTension: 0,
+            eyeMovement: 0,
+            microExpressions: []
+          },
+          environmentalFactors: {
+            lighting: brightness / 255,
+            noiseLevel: 0.5,
+            stability: 0
+          },
+          timestamp: Date.now(),
+          processingTime: Date.now() - startTime
+        }
+      }
+      
       // ★★★ ハイブリッドディープラーニング統合分析 ★★★
       let stressLevel: number
       let confidence: number
@@ -457,21 +499,31 @@ export class RealTimeStreamProcessor {
           const environmentalFeatures = this.analyzeEnvironmentalConditions(imageData, brightness)
           const temporalFeatures = this.extractTemporalFeatures()
           
-          // ★★★ StateOfTheArtEnhancements2024による高精度分析 ★★★
-          console.log('🧠 ハイブリッドAI分析実行中...')
+          // ★★★ HybridDeepLearningModelによる高精度分析 ★★★
+          console.log('🧠 本格ハイブリッドAI分析実行中...')
           
-          // 実際のハイブリッドAI分析を実行
-          const aiResult = this.performHybridAIAnalysis(
-            visualFeatures, 
-            hrFeatures, 
-            environmentalFeatures, 
-            temporalFeatures
-          )
+          // 本物のHybridDeepLearningModelを使用
+          const prediction = await this.aiAnalyzer.predict({
+            rppgSignal: hrFeatures,
+            hrvFeatures: temporalFeatures,
+            facialFeatures: visualFeatures,
+            pupilFeatures: visualFeatures.slice(0, 3)
+          })
           
-          stressLevel = aiResult.stressLevel
-          confidence = aiResult.confidence
+          stressLevel = this.convertStressLevelToNumber(prediction.stressLevel, prediction.probabilities)
+          confidence = prediction.confidence
           
-          console.log(`✅ ハイブリッドAI分析完了: ストレス=${stressLevel.toFixed(1)}, 信頼度=${confidence.toFixed(2)}`)
+          console.log(`✅ 本格ハイブリッドAI分析完了: ストレス=${stressLevel.toFixed(1)}, 信頼度=${confidence.toFixed(2)}`)
+          console.log('📊 AI予測詳細:', {
+            stressCategory: prediction.stressLevel,
+            probabilities: prediction.probabilities,
+            uncertainty: prediction.uncertainty,
+            features: {
+              cnn: prediction.features.cnnFeatures.length,
+              lstm: prediction.features.lstmFeatures.length,
+              gru: prediction.features.gruFeatures.length
+            }
+          })
           
         } catch (aiError) {
           console.warn('ハイブリッドAI分析エラー、フォールバック:', aiError)
@@ -523,7 +575,7 @@ export class RealTimeStreamProcessor {
   }
   
   /**
-   * ハイブリッドAI分析実行（StateOfTheArtEnhancements2024使用）
+   * ハイブリッドAI分析実行（HybridDeepLearningModel使用）
    */
   private static performHybridAIAnalysis(
     visualFeatures: number[],
@@ -532,7 +584,7 @@ export class RealTimeStreamProcessor {
     temporalFeatures: number[]
   ): { stressLevel: number; confidence: number } {
     // 簡易版ハイブリッドAI分析
-    // 実際のStateOfTheArtEnhancements2024の処理を模擬
+    // 実際のHybridDeepLearningModelの処理を模擬
     
     // 特徴量の重み付き統合
     const visualWeight = 0.4
@@ -576,6 +628,34 @@ export class RealTimeStreamProcessor {
     }
   }
   
+  /**
+   * ストレスレベル文字列を数値に変換（AI確率に基づく）
+   */
+  private static convertStressLevelToNumber(
+    stressLevel: 'low' | 'medium' | 'high',
+    probabilities: { low: number; medium: number; high: number }
+  ): number {
+    // AI予測確率に基づいた細かい数値計算
+    const lowContribution = probabilities.low * 20      // 0-20の範囲
+    const mediumContribution = probabilities.medium * 50 // 0-50の範囲  
+    const highContribution = probabilities.high * 100   // 0-100の範囲
+    
+    // 重み付き平均で最終スコア算出
+    const finalScore = lowContribution + mediumContribution + highContribution
+    
+    // カテゴリによる基本値調整
+    let baseScore: number
+    switch (stressLevel) {
+      case 'low': baseScore = 25; break
+      case 'medium': baseScore = 55; break  
+      case 'high': baseScore = 85; break
+      default: baseScore = 50
+    }
+    
+    // 基本スコアと確率ベース値の組み合わせ
+    return Math.max(0, Math.min(100, (baseScore * 0.7) + (finalScore * 0.3)))
+  }
+
   /**
    * 品質レベル計算
    */
@@ -658,6 +738,18 @@ export class RealTimeStreamProcessor {
    */
   static getStatistics(): StreamStatistics {
     return { ...this.statistics }
+  }
+  
+  /**
+   * 検出状態取得（新機能）
+   */
+  static getDetectionState() {
+    return {
+      faceDetected: this.detectionState.faceDetected,
+      faceBox: this.detectionState.faceBox,
+      detectionConfidence: this.detectionState.detectionConfidence,
+      measurementStatus: this.detectionState.measurementStatus
+    }
   }
   
   /**
@@ -1249,6 +1341,13 @@ export class IntegratedWebRTCStressEstimationSystem {
   }
 
   /**
+   * 検出状態取得（新機能）
+   */
+  static getDetectionState() {
+    return RealTimeStreamProcessor.getDetectionState()
+  }
+
+  /**
    * 実際の視覚特徴量抽出
    */
   private static extractRealVisualFeatures(imageData: ImageData, avgR: number, avgG: number, avgB: number, brightness: number, redDominance: number): number[] {
@@ -1574,6 +1673,65 @@ export class IntegratedWebRTCStressEstimationSystem {
       eyeMovement,
       microExpressions: [] // 今後実装
     }
+  }
+
+  /**
+   * 顔検出処理（新機能）
+   */
+  private static detectFaceInImage(imageData: ImageData): {
+    detected: boolean,
+    confidence: number,
+    boundingBox: { x: number; y: number; width: number; height: number } | null
+  } {
+    const { data, width, height } = imageData
+    
+    // 簡易肌色検出による顔領域推定
+    let skinPixels = 0
+    let totalPixels = 0
+    let avgR = 0, avgG = 0, avgB = 0
+    
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i]
+      const g = data[i + 1]
+      const b = data[i + 2]
+      
+      avgR += r
+      avgG += g
+      avgB += b
+      totalPixels++
+      
+      // 肌色判定（HSVベース簡易版）
+      if (r > 95 && g > 40 && b > 20 && 
+          Math.max(r, g, b) - Math.min(r, g, b) > 15 &&
+          Math.abs(r - g) > 15 && r > g && r > b) {
+        skinPixels++
+      }
+    }
+    
+    const skinRatio = skinPixels / totalPixels
+    const avgBrightness = (avgR + avgG + avgB) / (3 * totalPixels)
+    
+    // 顔検出判定
+    const detected = skinRatio > 0.1 && avgBrightness > 30 && avgBrightness < 230
+    const confidence = detected ? Math.min(0.9, skinRatio * 4 + 0.3) : 0
+    
+    // バウンディングボックス計算（簡易版）
+    let boundingBox = null
+    if (detected) {
+      const centerX = Math.floor(width * 0.5)
+      const centerY = Math.floor(height * 0.4)
+      const boxWidth = Math.floor(width * 0.4)
+      const boxHeight = Math.floor(height * 0.5)
+      
+      boundingBox = {
+        x: centerX - boxWidth / 2,
+        y: centerY - boxHeight / 2,
+        width: boxWidth,
+        height: boxHeight
+      }
+    }
+    
+    return { detected, confidence, boundingBox }
   }
 }
 

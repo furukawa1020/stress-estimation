@@ -15,6 +15,11 @@ interface AppState {
   stressResult: StressEstimationResult | null
   statistics: StreamStatistics | null
   systemStatus: any
+  // 新しい検出状態
+  faceDetected: boolean
+  faceBox: { x: number; y: number; width: number; height: number } | null
+  detectionConfidence: number
+  measurementStatus: 'detecting' | 'measuring' | 'unavailable' | 'error'
 }
 
 export default function StressEstimationApp() {
@@ -24,7 +29,11 @@ export default function StressEstimationApp() {
     error: null,
     stressResult: null,
     statistics: null,
-    systemStatus: null
+    systemStatus: null,
+    faceDetected: false,
+    faceBox: null,
+    detectionConfidence: 0,
+    measurementStatus: 'unavailable'
   })
   
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -71,21 +80,21 @@ export default function StressEstimationApp() {
         imageData
       )
       
-      // ストレス推定結果を構築
+      // ストレス推定結果を構築（型安全）
       const result: StressEstimationResult = {
-        stressLevel: analysis.stressLevel,
+        stressLevel: typeof analysis.stressLevel === 'string' ? 0 : analysis.stressLevel,
         confidence: analysis.confidence,
         physiologicalMetrics: {
-          heartRate: analysis.heartRate,
-          hrv: analysis.hrv,
-          facialTension: analysis.facialTension,
-          eyeMovement: analysis.eyeMovement,
-          microExpressions: analysis.microExpressions
+          heartRate: typeof analysis.heartRate === 'object' ? 0 : analysis.heartRate,
+          hrv: analysis.hrv || 0,
+          facialTension: analysis.facialTension || 0,
+          eyeMovement: analysis.eyeMovement || 0,
+          microExpressions: analysis.microExpressions || []
         },
         environmentalFactors: {
-          lighting: analysis.lighting,
-          noiseLevel: analysis.noiseLevel,
-          stability: analysis.stability
+          lighting: analysis.lighting || 0.5,
+          noiseLevel: analysis.noiseLevel || 0,
+          stability: analysis.stability || 1
         },
         timestamp: Date.now(),
         processingTime: analysis.processingTime
@@ -112,6 +121,35 @@ export default function StressEstimationApp() {
     
     // 1. 顔検出と領域分析
     const faceDetection = analyzeFaceRegion(imageData)
+    
+    // 顔検出状態を更新
+    setState(prev => ({
+      ...prev,
+      faceDetected: faceDetection.detected,
+      faceBox: faceDetection.detected && faceDetection.regions.length > 0 ? {
+        x: faceDetection.regions[0].x,
+        y: faceDetection.regions[0].y,
+        width: faceDetection.regions[0].width,
+        height: faceDetection.regions[0].height
+      } : null,
+      detectionConfidence: faceDetection.confidence,
+      measurementStatus: faceDetection.detected ? 
+        (faceDetection.confidence > 0.7 ? 'measuring' : 'detecting') : 
+        'unavailable'
+    }))
+    
+    // 顔が検出されない場合は早期リターン
+    if (!faceDetection.detected) {
+      return {
+        heartRate: { bpm: '--', hrv: 0, quality: 0 },
+        stressLevel: '--',
+        confidence: 0,
+        emotionalState: 'unknown',
+        faceDetected: false,
+        error: '顔が検出されません',
+        processingTime: performance.now() - startTime
+      }
+    }
     
     // 2. rPPG心拍数推定（ImageDataを渡す）
     const heartRate = analyzeHeartRate(visualFeatures, faceDetection, imageData)
@@ -2131,9 +2169,16 @@ export default function StressEstimationApp() {
       ctx.fillRect(10, 10, 300, 140)
       
       // ストレスレベル
+      const detectionState = IntegratedWebRTCStressEstimationSystem.getDetectionState()
+      
       ctx.fillStyle = getStressColor(stressLevel)
       ctx.font = 'bold 28px Arial'
-      ctx.fillText(`ストレス: ${stressLevel}`, 20, 40)
+      
+      if (detectionState.measurementStatus === 'unavailable' || detectionState.measurementStatus === 'error') {
+        ctx.fillText('ストレス: --', 20, 40)
+      } else {
+        ctx.fillText(`ストレス: ${stressLevel}`, 20, 40)
+      }
       
       // 詳細情報
       ctx.fillStyle = '#ffffff'
@@ -2142,10 +2187,27 @@ export default function StressEstimationApp() {
       ctx.fillText(`心拍数: ${heartRate} bpm`, 20, 85)
       ctx.fillText(`処理時間: ${isNaN(state.stressResult.processingTime) ? 0 : Math.round(state.stressResult.processingTime)}ms`, 20, 105)
       
-      // リアルタイム分析状況
-      ctx.fillStyle = '#00ff00'
+      // 検出状態表示
+      const detectionStateStatus = IntegratedWebRTCStressEstimationSystem.getDetectionState()
+      ctx.fillStyle = detectionStateStatus.measurementStatus === 'unavailable' ? '#ff0000' : '#00ff00'
       ctx.font = '12px Arial'
-      ctx.fillText('🔍 リアルタイム分析中...', 20, 125)
+      
+      if (detectionStateStatus.measurementStatus === 'unavailable') {
+        ctx.fillText('❌ 顔検出失敗 - 測定不可能', 20, 125)
+      } else if (detectionStateStatus.measurementStatus === 'detecting') {
+        ctx.fillText('🔍 顔検出中...', 20, 125)
+      } else if (detectionStateStatus.measurementStatus === 'measuring') {
+        ctx.fillText('✅ 測定中 - 顔検出済み', 20, 125)
+      } else {
+        ctx.fillText('⚠️ エラー状態', 20, 125)
+      }
+      
+      // 顔検出信頼度表示
+      if (detectionStateStatus.detectionConfidence > 0) {
+        ctx.fillStyle = '#ffffff'
+        ctx.font = '12px Arial'
+        ctx.fillText(`顔検出信頼度: ${Math.round(detectionStateStatus.detectionConfidence * 100)}%`, 20, 145)
+      }
       
       // 環境要因パネル
       if (state.stressResult.environmentalFactors) {
@@ -2569,8 +2631,69 @@ export default function StressEstimationApp() {
                 <canvas
                   ref={canvasRef}
                   className="w-full h-auto border border-gray-300"
-                  style={{ maxHeight: '500px', minHeight: '400px' }}
+                  style={{ 
+                    maxHeight: '500px', 
+                    minHeight: '400px',
+                    transform: 'scaleX(-1)' // ミラーリング表示
+                  }}
                 />
+                
+                {/* リアルタイム検出状態オーバーレイ */}
+                {state.isRunning && (
+                  <div className="absolute top-4 left-4 right-4">
+                    <div className="flex justify-between items-start">
+                      {/* 検出ステータス */}
+                      <div className={`px-3 py-2 rounded-lg text-sm font-bold ${
+                        state.faceDetected 
+                          ? 'bg-green-500 text-white' 
+                          : 'bg-red-500 text-white'
+                      }`}>
+                        {state.faceDetected 
+                          ? `👤 顔検出中 ${(state.detectionConfidence * 100).toFixed(0)}%`
+                          : '❌ 顔が検出されません'
+                        }
+                      </div>
+                      
+                      {/* 測定ステータス */}
+                      <div className={`px-3 py-2 rounded-lg text-sm font-bold ${
+                        state.measurementStatus === 'measuring' ? 'bg-blue-500 text-white' :
+                        state.measurementStatus === 'detecting' ? 'bg-yellow-500 text-black' :
+                        'bg-gray-500 text-white'
+                      }`}>
+                        {state.measurementStatus === 'measuring' && '📊 測定中'}
+                        {state.measurementStatus === 'detecting' && '🔍 検出中'}
+                        {state.measurementStatus === 'unavailable' && '-- 測定不可'}
+                        {state.measurementStatus === 'error' && '⚠️ エラー'}
+                      </div>
+                    </div>
+                    
+                    {/* ストレス値表示 */}
+                    {state.stressResult && (
+                      <div className="mt-2 bg-black bg-opacity-70 text-white p-3 rounded-lg">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-300">ストレス値:</span>
+                            <span className="ml-2 font-bold text-lg">
+                              {state.measurementStatus === 'measuring' 
+                                ? state.stressResult.stressLevel.toFixed(1)
+                                : '--'
+                              }
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-300">心拍数:</span>
+                            <span className="ml-2 font-bold text-lg">
+                              {state.measurementStatus === 'measuring' 
+                                ? `${state.stressResult.physiologicalMetrics.heartRate.toFixed(0)} BPM`
+                                : '--'
+                              }
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 
                 {!state.isRunning && (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
