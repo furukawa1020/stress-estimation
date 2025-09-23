@@ -1748,12 +1748,10 @@ export default function StressEstimationApp() {
   }
   
   /**
-   * 顔認識結果をcanvasに描画
+   * 軽量Canvas描画（AI処理なし）
    */
-  const drawFaceOverlay = async () => {
+  const drawFaceOverlay = () => {
     if (!videoRef.current || !canvasRef.current) {
-      console.log('🔍 drawFaceOverlay: 要素チェック失敗')
-      // リトライのため次のフレームを予約
       if (state.isRunning) {
         animationFrameRef.current = requestAnimationFrame(drawFaceOverlay)
       }
@@ -1765,73 +1763,42 @@ export default function StressEstimationApp() {
     const ctx = canvas.getContext('2d')
     
     if (!ctx) {
-      console.error('❌ Canvas context取得失敗')
       return
     }
     
-    // ビデオの準備状態を詳細チェック
-    if (video.readyState < 2) { // HAVE_CURRENT_DATA未満
-      console.log('⏳ ビデオ準備待ち - readyState:', video.readyState)
+    // ビデオの準備状態を簡易チェック
+    if (video.readyState < 2) {
       animationFrameRef.current = requestAnimationFrame(drawFaceOverlay)
       return
     }
     
-    // ビデオの実際の解像度を取得
-    const videoWidth = video.videoWidth
-    const videoHeight = video.videoHeight
+    // ビデオサイズ取得
+    const videoWidth = video.videoWidth || 640
+    const videoHeight = video.videoHeight || 480
     
-    if (videoWidth === 0 || videoHeight === 0) {
-      console.log('📏 ビデオサイズ待ち - width:', videoWidth, 'height:', videoHeight)
-      animationFrameRef.current = requestAnimationFrame(drawFaceOverlay)
-      return
-    }
-    
-    // キャンバスサイズを動画サイズに合わせる
+    // キャンバスサイズ設定
     if (canvas.width !== videoWidth || canvas.height !== videoHeight) {
       canvas.width = videoWidth
       canvas.height = videoHeight
-      console.log('🎬 Canvas サイズ設定:', { width: videoWidth, height: videoHeight })
     }
     
     try {
-      // 背景をクリア
+      // 軽量描画：ビデオフレームのみ
       ctx.clearRect(0, 0, canvas.width, canvas.height)
-      
-      // ビデオフレームを描画（最重要！）
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-      console.log('🖼️ ビデオフレーム描画完了')
       
-      // 軽量化：AI処理を分離（Canvas描画を優先）
-      // 単純なオーバーレイのみ描画
+      // 軽量オーバーレイ
       ctx.fillStyle = 'rgba(0, 255, 0, 0.2)'
-      ctx.fillRect(50, 50, 200, 200) // 簡易顔検出ボックス
+      ctx.fillRect(50, 50, 200, 200)
       ctx.fillStyle = '#00ff00'
       ctx.font = '16px Arial'
-      ctx.fillText('✅ カメラ動作中', 20, 30)
-      
-      // 軽量状態更新
-      setState(prev => ({ 
-        ...prev,
-        statistics: {
-          fps: 30, // 軽量化で高FPS達成
-          frameDrops: 0,
-          processingLatency: 1,
-          aiInferenceTime: 1,
-          totalFramesProcessed: (prev.statistics?.totalFramesProcessed || 0) + 1,
-          errorCount: 0,
-          memoryUsage: 25,
-          cpuUsage: 5
-        }
-      }))
-      
-      // AIオーバーレイを描画（実際のAI処理結果に基づく）
-      drawRealTimeAIOverlay(ctx, canvas.width, canvas.height)
+      ctx.fillText('カメラ動作中', 20, 30)
       
     } catch (error) {
-      console.error('❌ Canvas描画エラー:', error)
+      console.error('Canvas描画エラー:', error)
     }
     
-    // 次のフレームを予約
+    // 次のフレーム予約（重い処理なし）
     if (state.isRunning) {
       animationFrameRef.current = requestAnimationFrame(drawFaceOverlay)
     }
