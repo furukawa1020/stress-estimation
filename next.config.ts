@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 
+/** @type {import('next').NextConfig} */
 const nextConfig: NextConfig = {
   // Vercel対応: Turbopack設定を環境別に分離
   ...(process.env.NODE_ENV === 'development' && {
@@ -18,11 +19,6 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   
   // WebRTC・カメラアクセス用セキュリティヘッダー
-  /** @type {import('next').NextConfig} */
-const nextConfig = {
-  turbo: {
-    moduleIdStrategy: 'deterministic',
-  },
   headers: async () => [
     {
       source: '/(.*)',
@@ -42,15 +38,11 @@ const nextConfig = {
       ],
     },
   ],
-  outputFileTracingRoot: process.cwd(),
   serverComponentsExternalPackages: [
     '@tensorflow/tfjs',
     '@tensorflow/tfjs-node',
     '@vladmandic/face-api',
   ],
-  experimental: {
-    turbo: {},
-  },
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -84,9 +76,6 @@ const nextConfig = {
 
     return config;
   },
-};
-
-export default nextConfig;
 };
 
 export default nextConfig;
