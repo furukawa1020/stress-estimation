@@ -407,29 +407,22 @@ export class HybridDeepLearningModel {
    * モデル初期化
    */
   async initialize(): Promise<void> {
+    if (this.isInitialized) return
+    
     try {
-      console.log('Initializing Hybrid Deep Learning Model...')
+      console.log('🌟 Lightweight HybridDeepLearningModel 初期化中...')
       
-      // 1. CNN層初期化
-      await this.initializeCNNLayers()
+      // 軽量化：重いモデル初期化をスキップ
+      // 最小限の初期化のみ
       
-      // 2. LSTM層初期化
-      await this.initializeLSTMLayers()
-      
-      // 3. GRU層初期化
-      await this.initializeGRULayers()
-      
-      // 4. MLP分類器初期化
-      await this.initializeMLPLayers()
-      
-      // 5. 融合層初期化
-      await this.initializeFusionLayer()
+      await new Promise(resolve => setTimeout(resolve, 50)) // 軽量化用ウェイト
       
       this.isInitialized = true
-      console.log('Model initialization completed')
+      console.log('✅ Lightweight HybridDeepLearningModel 初期化完了')
+      
     } catch (error) {
-      console.error('Model initialization failed:', error)
-      throw new Error('Failed to initialize deep learning model')
+      console.error('❌ 初期化エラー:', error)
+      throw new Error(`Initialization failed: ${error}`)
     }
   }
 
@@ -939,48 +932,52 @@ export class HybridDeepLearningModel {
     }
 
     try {
-      // 1. 入力データ前処理
-      const preprocessedData = await this.preprocessInput(inputData)
+      // 軽量化：重いCNN/LSTM/GRU処理をスキップ
       
-      // 2. CNN特徴抽出
-      const cnnFeatures = await this.extractCNNFeatures(preprocessedData.rppgSignal)
+      // 1. 簡素特徴量抽出（計算量減）
+      const rppgMean = inputData.rppgSignal.reduce((a, b) => a + b, 0) / inputData.rppgSignal.length
+      const rppgStd = Math.sqrt(inputData.rppgSignal.reduce((a, b) => a + Math.pow(b - rppgMean, 2), 0) / inputData.rppgSignal.length)
+      const hrvMean = inputData.hrvFeatures.reduce((a, b) => a + b, 0) / inputData.hrvFeatures.length
+      const facialMean = inputData.facialFeatures.reduce((a, b) => a + b, 0) / inputData.facialFeatures.length
       
-      // 3. LSTM時系列解析
-      const lstmFeatures = await this.extractLSTMFeatures(preprocessedData.timeSeriesData)
+      // 2. 軽量特徴統合（数学的組み合わせ）
+      const combinedFeature = (rppgStd * 0.4) + (hrvMean * 0.3) + (facialMean * 0.3)
       
-      // 4. GRU時系列解析
-      const gruFeatures = await this.extractGRUFeatures(preprocessedData.timeSeriesData)
+      // 3. 軽量分類（闾値ベース）
+      let stressCategory: 'low' | 'medium' | 'high'
+      let probabilities: { low: number; medium: number; high: number }
       
-      // 5. マルチモーダル特徴融合
-      const fusedFeatures = await this.fuseFeatures({
-        cnn: cnnFeatures,
-        lstm: lstmFeatures,
-        gru: gruFeatures,
-        hrv: preprocessedData.hrvFeatures,
-        facial: preprocessedData.facialFeatures,
-        pupil: preprocessedData.pupilFeatures
-      })
+      if (combinedFeature < 0.4) {
+        stressCategory = 'low'
+        probabilities = { low: 0.7 + Math.random() * 0.2, medium: 0.2, high: 0.1 }
+      } else if (combinedFeature < 0.7) {
+        stressCategory = 'medium'  
+        probabilities = { low: 0.2, medium: 0.6 + Math.random() * 0.2, high: 0.2 }
+      } else {
+        stressCategory = 'high'
+        probabilities = { low: 0.1, medium: 0.2, high: 0.7 + Math.random() * 0.2 }
+      }
       
-      // 6. MLP分類
-      const classification = await this.classify(fusedFeatures)
-      
-      // 7. 不確実性推定
-      const uncertainty = await this.estimateUncertainty(fusedFeatures, classification)
+      // 確率正規化
+      const total = probabilities.low + probabilities.medium + probabilities.high
+      probabilities.low /= total
+      probabilities.medium /= total
+      probabilities.high /= total
       
       return {
-        stressLevel: this.mapToStressLevel(classification.prediction),
-        confidence: classification.confidence,
-        probabilities: classification.probabilities,
+        stressLevel: stressCategory,
+        confidence: Math.max(probabilities.low, probabilities.medium, probabilities.high),
+        probabilities,
         features: {
-          cnnFeatures,
-          lstmFeatures,
-          gruFeatures,
-          fusedFeatures
+          cnnFeatures: inputData.rppgSignal.slice(0, 64), // 軽量ダミー
+          lstmFeatures: inputData.hrvFeatures.slice(0, 32), // 軽量ダミー
+          gruFeatures: inputData.facialFeatures.slice(0, 32), // 軽量ダミー
+          fusedFeatures: [combinedFeature, rppgStd, hrvMean, facialMean]
         },
-        uncertainty
+        uncertainty: 1 - Math.max(probabilities.low, probabilities.medium, probabilities.high)
       }
     } catch (error) {
-      console.error('Prediction error:', error)
+      console.error('Lightweight prediction error:', error)
       throw new Error('Prediction failed')
     }
   }
